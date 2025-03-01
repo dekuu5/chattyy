@@ -1,0 +1,151 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js" 
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              Int          @id @default(autoincrement())
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+  deletedAt       DateTime?    @map("deleted_at")
+  username        String       @unique
+  email           String       @unique
+  password        String
+  name            String
+  profileImage    String?      @map("profile_image")
+  bio             String?
+  profileStatus   ProfileStatus @default(active) @map("profile_status")
+  isActive        Boolean      @default(true) @map("is_active")
+  isAdmin         Boolean      @default(false) @map("is_admin")
+  isVerified      Boolean      @default(false) @map("is_verified")
+  birthDate       DateTime     @map("birth_date")
+  city            String
+  sentRequests    Friends[]    @relation("SentRequests")
+  receivedRequests Friends[]   @relation("ReceivedRequests")
+  messages        Message[]
+  participations  Participation[]
+  groupAdmins     GroupAdmin[]
+
+  @@index([email])
+  @@index([username])
+  @@map("users")
+}
+
+enum ProfileStatus {
+  active
+  inactive
+  pending
+}
+
+model Friends {
+  sentID        Int           @map("sent_id")
+  receivedID    Int           @map("received_id")
+  dateSent      DateTime      @map("date_sent") // Fixed field name from dateSend
+  status        FriendStatus
+  dateAccepted  DateTime?     @map("date_accepted")
+  dateDeclined  DateTime?     @map("date_declined")
+
+  sender        User          @relation("SentRequests", fields: [sentID], references: [id], onDelete: Cascade)
+  receiver      User          @relation("ReceivedRequests", fields: [receivedID], references: [id], onDelete: Cascade)
+
+  @@id([sentID, receivedID])
+  @@unique([sentID, receivedID])
+  @@map("friends")
+}
+
+enum FriendStatus {
+  pending
+  accepted
+  declined
+}
+
+model Message {
+  id          Int          @id @default(autoincrement())
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+  senderId    Int          @map("sender_id")
+  contentType ContentType  @map("content_type")
+  content     Json
+  isEdited    Boolean      @default(false) @map("is_edited")
+  chatId      Int          @map("chat_id")
+
+  sender      User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  chat        Chat         @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  @@index([senderId])
+  @@index([chatId])
+  @@map("messages")
+}
+
+enum ContentType {
+  text
+  image
+  video
+}
+
+model Chat {
+  id           Int            @id @default(autoincrement())
+  createdAt    DateTime       @default(now()) @map("created_at")
+  updatedAt    DateTime       @updatedAt @map("updated_at")
+  type         ChatType
+  messages     Message[]
+  participants Participation[]
+  group        Group?         // One-to-one relation (optional)
+
+  @@map("chats")
+}
+
+enum ChatType {
+  private
+  group
+}
+
+model Participation {
+  userId     Int       @map("user_id")
+  chatId     Int       @map("chat_id")
+  dateJoined DateTime  @default(now()) @map("date_joined")
+  isActive   Boolean   @default(true) @map("is_active")
+
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chat       Chat      @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  @@id([userId, chatId])
+  @@map("participations")
+}
+
+model Group {
+  id               Int         @id @map("chat_id")
+  createdAt        DateTime    @default(now()) @map("created_at")
+  updatedAt        DateTime    @updatedAt @map("updated_at")
+  profilePic       String?     @map("profile_pic")
+  groupName        String      @map("group_name")
+  groupDescription String      @map("group_description")
+  groupAdmins      GroupAdmin[]
+  chat             Chat        @relation(fields: [id], references: [id], onDelete: Cascade)
+
+  @@map("groups")
+}
+model GroupAdmin {
+  userId      Int         @map("user_id")
+  groupId     Int         @map("group_id")
+  accessLevel AccessLevel @map("access_level")
+  createdAt   DateTime    @default(now()) @map("created_at")
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group       Group       @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@id([userId, groupId])
+  @@map("group_admins")
+}
+
+enum AccessLevel {
+  admin
+  moderator
+}
